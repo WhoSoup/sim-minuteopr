@@ -80,17 +80,36 @@ func main() {
 	hashpower = *hashpowerF
 	samples = *samplesF
 
+	//TryStrategy("Old Mining", OldMining)
 	TryStrategy("Strategy One (1)", func() []*MinuteOPR { return StrategyOne(threshold, 1) })
 	TryStrategy("Strategy One (2)", func() []*MinuteOPR { return StrategyOne(threshold, 2) })
 	TryStrategy("Strategy One (4)", func() []*MinuteOPR { return StrategyOne(threshold, 4) })
 	TryStrategy("Strategy One (8)", func() []*MinuteOPR { return StrategyOne(threshold, 8) })
 	TryStrategy("Strategy One (16)", func() []*MinuteOPR { return StrategyOne(threshold, 16) })
-	TryStrategy("Strategy Two", func() []*MinuteOPR { return StrategyTwo() })
+	TryStrategy("Strategy Two", StrategyTwo)
 	TryStrategy("Strategy Three (1)", func() []*MinuteOPR { return StrategyThree(1) })
 	TryStrategy("Strategy Three (2)", func() []*MinuteOPR { return StrategyThree(2) })
 	TryStrategy("Strategy Three (4)", func() []*MinuteOPR { return StrategyThree(4) })
 	TryStrategy("Strategy Three (8)", func() []*MinuteOPR { return StrategyThree(8) })
 	TryStrategy("Strategy Three (16)", func() []*MinuteOPR { return StrategyThree(16) })
+}
+
+func OldMining() []*MinuteOPR {
+	results := make(TopX, 16)
+
+	hashes := hashpower
+	for hashes > 0 {
+		results.Add(rng.Uint64())
+		hashes--
+	}
+
+	oprs := make([]*MinuteOPR, 0)
+	for _, r := range results {
+		if r >= threshold {
+			oprs = append(oprs, &MinuteOPR{Minimum: r})
+		}
+	}
+	return oprs
 }
 
 func StrategyOne(threshold uint64, limit int) []*MinuteOPR {
