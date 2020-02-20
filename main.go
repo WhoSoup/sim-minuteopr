@@ -15,9 +15,53 @@ var rng *rand.Rand
 var hashpower int
 var threshold uint64 = 0xffff000000000000
 var samples int
+var compare bool
 
 func init() {
 	rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+}
+
+type Rank struct {
+	Power int
+	Rank  uint64
+}
+
+func CompareHashpower() {
+	var powers []int
+	for i := 8192; i < 20000000; i *= 2 {
+		powers = append(powers, i)
+	}
+
+	ranking := make([]Rank, 0)
+
+	for _, power := range powers {
+		opr := make([]uint64, MINUTES)
+
+		for min := 0; min < MINUTES; min++ {
+			for i := 0; i < power; i++ {
+				pow := rng.Uint64()
+				if pow > opr[min] {
+					opr[min] = pow
+				}
+			}
+		}
+
+		min := opr[0]
+		for _, pow := range opr {
+			if pow < min {
+				min = pow
+			}
+		}
+
+		ranking = append(ranking, Rank{Power: power, Rank: min})
+	}
+
+	sort.Slice(ranking, func(i, j int) bool { return ranking[j].Rank < ranking[i].Rank })
+
+	for _, r := range ranking {
+		fmt.Printf("%d ", r.Power)
+	}
+	fmt.Println()
 }
 
 func CreateBases(limit int) []*MinuteOPR {
@@ -38,7 +82,9 @@ func CreateBases(limit int) []*MinuteOPR {
 func TryStrategy(name string, f func() []*MinuteOPR) {
 	sum := big.NewInt(0)
 
-	fmt.Println(name, "\n=====================")
+	if !compare {
+		fmt.Println(name, "\n=====================")
+	}
 
 	var best *MinuteOPR
 	found := 0
@@ -57,7 +103,7 @@ func TryStrategy(name string, f func() []*MinuteOPR) {
 			}
 		}
 
-		if len(submitted) > 0 {
+		if !compare && len(submitted) > 0 {
 			fmt.Printf("%d", i)
 			for _, b := range submitted {
 				fmt.Printf(";%d", b.Minimum-threshold)
@@ -66,7 +112,9 @@ func TryStrategy(name string, f func() []*MinuteOPR) {
 		}
 	}
 
-	if found == 0 {
+	if compare {
+		fmt.Println(name, found)
+	} else if found == 0 {
 		fmt.Println(name)
 		fmt.Println("No OPRs above threshold found")
 		return
@@ -76,22 +124,30 @@ func TryStrategy(name string, f func() []*MinuteOPR) {
 func main() {
 	hashpowerF := flag.Int("hashpower", 1000000, "the simulated amount of hashpower, in hashes/chunk")
 	samplesF := flag.Int("samples", 1000, "number of samples")
+	hpCompare := flag.Bool("compare", false, "compare hash power for one strategy")
 	flag.Parse()
 	hashpower = *hashpowerF
 	samples = *samplesF
+	compare = *hpCompare
 
-	//TryStrategy("Old Mining", OldMining)
-	TryStrategy("Strategy One (1)", func() []*MinuteOPR { return StrategyOne(threshold, 1) })
-	TryStrategy("Strategy One (2)", func() []*MinuteOPR { return StrategyOne(threshold, 2) })
-	TryStrategy("Strategy One (4)", func() []*MinuteOPR { return StrategyOne(threshold, 4) })
-	TryStrategy("Strategy One (8)", func() []*MinuteOPR { return StrategyOne(threshold, 8) })
-	TryStrategy("Strategy One (16)", func() []*MinuteOPR { return StrategyOne(threshold, 16) })
-	TryStrategy("Strategy Two", StrategyTwo)
-	TryStrategy("Strategy Three (1)", func() []*MinuteOPR { return StrategyThree(1) })
-	TryStrategy("Strategy Three (2)", func() []*MinuteOPR { return StrategyThree(2) })
-	TryStrategy("Strategy Three (4)", func() []*MinuteOPR { return StrategyThree(4) })
-	TryStrategy("Strategy Three (8)", func() []*MinuteOPR { return StrategyThree(8) })
-	TryStrategy("Strategy Three (16)", func() []*MinuteOPR { return StrategyThree(16) })
+	if compare {
+		for i := 0; i < samples; i++ {
+			CompareHashpower()
+		}
+	} else {
+		//TryStrategy("Old Mining", OldMining)
+		TryStrategy("Strategy One (1)", func() []*MinuteOPR { return StrategyOne(threshold, 1) })
+		TryStrategy("Strategy One (2)", func() []*MinuteOPR { return StrategyOne(threshold, 2) })
+		TryStrategy("Strategy One (4)", func() []*MinuteOPR { return StrategyOne(threshold, 4) })
+		TryStrategy("Strategy One (8)", func() []*MinuteOPR { return StrategyOne(threshold, 8) })
+		TryStrategy("Strategy One (16)", func() []*MinuteOPR { return StrategyOne(threshold, 16) })
+		TryStrategy("Strategy Two", StrategyTwo)
+		TryStrategy("Strategy Three (1)", func() []*MinuteOPR { return StrategyThree(1) })
+		TryStrategy("Strategy Three (2)", func() []*MinuteOPR { return StrategyThree(2) })
+		TryStrategy("Strategy Three (4)", func() []*MinuteOPR { return StrategyThree(4) })
+		TryStrategy("Strategy Three (8)", func() []*MinuteOPR { return StrategyThree(8) })
+		TryStrategy("Strategy Three (16)", func() []*MinuteOPR { return StrategyThree(16) })
+	}
 }
 
 func OldMining() []*MinuteOPR {
